@@ -5,7 +5,6 @@ const User = require('../models/user');
 exports.getStatus = async (req, res, next) => {
   try {
     const { status } = await User.findById(req.userId);
-    
     return res.status(200).json({ status });
   } catch (e) {
     return next(e);
@@ -22,8 +21,9 @@ exports.postStatus = async (req, res, next) => {
     return next(error);
   }
   
+  const { status } = req.body;
+  
   try {
-    const { status } = req.body;
     const user = await User.findById(req.userId);
     user.status = status;
     

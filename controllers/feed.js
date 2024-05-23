@@ -28,8 +28,9 @@ exports.createPost = async (req, res, next) => {
     return next(error); // Correct way to handle errors in async functions
   }
   
+  const { title, content } = req.body;
+  
   try {
-    const { title, content } = req.body;
     
     if (!req.file) {
       const error = new Error('No Image Provided!');
@@ -63,9 +64,9 @@ exports.createPost = async (req, res, next) => {
 }
 
 exports.getPost = async (req, res, next) => {
+  const { postId } = req.params;
+  
   try {
-    const { postId } = req.params;
-    
     const post = await Post.findById(postId);
     
     if (!post) {
@@ -88,11 +89,11 @@ exports.editPost = async (req, res, next) => {
     return next(error);
   }
   
+  const { postId } = req.params;
+  const { title, content } = req.body;
+  let imageUrl;
+  
   try {
-    const { postId } = req.params;
-    const { title, content } = req.body;
-    let imageUrl;
-    
     const existingPost = await getPostById(postId);
     
     if (!existingPost.creator.equals(req.userId)) {
@@ -124,8 +125,9 @@ exports.editPost = async (req, res, next) => {
 }
 
 exports.deletePost = async (req, res, next) => {
+  const { postId } = req.params;
+  
   try {
-    const { postId } = req.params;
     const existingPost = await getPostById(postId);
     
     if (!existingPost.creator.equals(req.userId)) {

@@ -35,7 +35,6 @@ app.use((error, req, res, next) => {
   res.status(statusCode || 500).json({ message, data });
 });
 
-
 const initializeApp = async () => {
   try {
     await connect(process.env.MONGODB_URI);
