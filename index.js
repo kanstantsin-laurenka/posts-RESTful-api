@@ -3,6 +3,7 @@ const path = require('node:path');
 
 const express = require('express');
 const { connect } = require('mongoose');
+const { initSocket } = require('./socket');
 
 const feedRoutes = require('./routes/feed');
 const authRoutes = require('./routes/auth');
@@ -38,8 +39,18 @@ app.use((error, req, res, next) => {
 const initializeApp = async () => {
   try {
     await connect(process.env.MONGODB_URI);
-    app.listen(8080, () => {
+    const server = app.listen(8080, () => {
       console.log('Server is running on port 8080');
+    });
+    
+    const io = initSocket(server);
+    
+    io.on('connection', socket => {
+      console.log('Client connected!');
+      
+      socket.on('disconnect', () => {
+        console.log('Client disconnected!');
+      })
     });
   } catch (e) {
     console.error(e);

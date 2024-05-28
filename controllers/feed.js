@@ -2,16 +2,23 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 const { validationResult } = require('express-validator');
+
 const Post = require('../models/post');
 const User = require('../models/user');
+const { getIO } = require('../socket');
 
 exports.getPosts = async (req, res, next) => {
   const currentPage = req.query.page || 1;
-  const perPage = 2;
+  const perPage = 10;
   
   try {
     const totalItems = await Post.countDocuments();
-    const posts = await Post.find().populate('creator').skip((currentPage - 1) * perPage).limit(perPage);
+    const posts = await Post
+      .find()
+      .sort({ createdAt: -1 })
+      .populate('creator')
+      .skip((currentPage - 1) * perPage)
+      .limit(perPage);
     
     res.status(200).json({ posts, totalItems });
   } catch (e) {
@@ -31,7 +38,6 @@ exports.createPost = async (req, res, next) => {
   const { title, content } = req.body;
   
   try {
-    
     if (!req.file) {
       const error = new Error('No Image Provided!');
       error.statusCode = 422;
@@ -52,6 +58,8 @@ exports.createPost = async (req, res, next) => {
     const user = await User.findById(req.userId);
     user.posts.push(post); // Mongoose will take post._id automatically
     await user.save();
+    
+    getIO().emit('post', { action: 'create', post: { ...post._doc, creator: { _id: req.userId, name: user.name } } });
     
     res.status(201).json({
       creator: { _id: user._id, name: user.name },
@@ -94,9 +102,9 @@ exports.editPost = async (req, res, next) => {
   let imageUrl;
   
   try {
-    const existingPost = await getPostById(postId);
+    const existingPost = await getPostById(postId, next);
     
-    if (!existingPost.creator.equals(req.userId)) {
+    if (!existingPost.creator._id.equals(req.userId)) {
       const error = new Error('Forbidden!');
       error.statusCode = 403;
       return next(error);
@@ -107,17 +115,19 @@ exports.editPost = async (req, res, next) => {
       imageUrl = req.file.path;
       // If the image URL has changed, clear the old image.
       if (existingPost.imageUrl !== imageUrl) {
-        await clearImage(post.imageUrl);
+        await clearImage(existingPost.imageUrl);
       }
     } else {
       imageUrl = existingPost.imageUrl;
     }
     
-    existingPost.title = title;
     existingPost.content = content;
     existingPost.imageUrl = imageUrl;
+    existingPost.title = title;
     
     const post = await existingPost.save();
+    
+    getIO().emit('post', { action: 'update', post });
     res.status(200).json({ message: 'Post Updated!', post });
   } catch (e) {
     return next(e);
@@ -128,9 +138,9 @@ exports.deletePost = async (req, res, next) => {
   const { postId } = req.params;
   
   try {
-    const existingPost = await getPostById(postId);
+    const existingPost = await getPostById(postId, next);
     
-    if (!existingPost.creator.equals(req.userId)) {
+    if (!existingPost.creator._id.equals(req.userId)) {
       const error = new Error('Forbidden!');
       error.statusCode = 403;
       return next(error);
@@ -143,6 +153,7 @@ exports.deletePost = async (req, res, next) => {
     await user.save();
     await clearImage(existingPost.imageUrl);
     
+    getIO().emit('post', { action: 'delete', post: post._id });
     res.status(200).send({ message: `Post with ID ${postId} was successfully removed.`, post: post });
   } catch (e) {
     return next(e); // Correct way to handle errors in async functions
@@ -159,8 +170,8 @@ const clearImage = async (filePath) => {
   }
 }
 
-const getPostById = async (postId) => {
-  const post = await Post.findById(postId);
+const getPostById = async (postId, next) => {
+  const post = await Post.findById(postId).populate('creator');
   
   if (!post) {
     const error = new Error('Post was not found!');
