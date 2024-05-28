@@ -5,7 +5,6 @@ const { validationResult } = require('express-validator');
 
 const Post = require('../models/post');
 const User = require('../models/user');
-const { getIO } = require('../socket');
 
 exports.getPosts = async (req, res, next) => {
   const currentPage = req.query.page || 1;
@@ -58,8 +57,6 @@ exports.createPost = async (req, res, next) => {
     const user = await User.findById(req.userId);
     user.posts.push(post); // Mongoose will take post._id automatically
     await user.save();
-    
-    getIO().emit('post', { action: 'create', post: { ...post._doc, creator: { _id: req.userId, name: user.name } } });
     
     res.status(201).json({
       creator: { _id: user._id, name: user.name },
@@ -126,8 +123,6 @@ exports.editPost = async (req, res, next) => {
     existingPost.title = title;
     
     const post = await existingPost.save();
-    
-    getIO().emit('post', { action: 'update', post });
     res.status(200).json({ message: 'Post Updated!', post });
   } catch (e) {
     return next(e);
@@ -153,7 +148,6 @@ exports.deletePost = async (req, res, next) => {
     await user.save();
     await clearImage(existingPost.imageUrl);
     
-    getIO().emit('post', { action: 'delete', post: post._id });
     res.status(200).send({ message: `Post with ID ${postId} was successfully removed.`, post: post });
   } catch (e) {
     return next(e); // Correct way to handle errors in async functions

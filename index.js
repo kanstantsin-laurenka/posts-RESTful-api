@@ -3,11 +3,6 @@ const path = require('node:path');
 
 const express = require('express');
 const { connect } = require('mongoose');
-const { initSocket } = require('./socket');
-
-const feedRoutes = require('./routes/feed');
-const authRoutes = require('./routes/auth');
-const statusRoutes = require('./routes/status');
 
 const app = express();
 
@@ -21,9 +16,6 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use('/auth', authRoutes);
-app.use('/feed', feedRoutes);
-app.use('/status', statusRoutes);
 app.use((req, res, next) => {
   res.status(404).send('<h1>Page not found</h1>');
 });
@@ -39,11 +31,9 @@ app.use((error, req, res, next) => {
 const initializeApp = async () => {
   try {
     await connect(process.env.MONGODB_URI);
-    const server = app.listen(8080, () => {
+    app.listen(8080, () => {
       console.log('Server is running on port 8080');
     });
-    
-    const io = initSocket(server);
     
     io.on('connection', socket => {
       console.log('Client connected!');
